@@ -1,0 +1,39 @@
+name: pipeline # You can add your own name for the pipeline here
+
+# Trigger when committing to main branch
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual triggering of the workflow
+
+jobs:
+  # Pack and upload the deployment Artifact
+  cloud-artifact:
+    name: "Prepare and Upload Artifact"
+    uses: ./.github/workflows/cloud-artifact.yml
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
+
+  # Deploy to Umbraco Cloud
+  # ####
+  # you can edit the variables noBuildAndRestore, skipVersionCheck, skipPreserveUmbracoCloudJson, 
+  # and runSchemaExtraction
+  # use booleans but as strings
+  cloud-deployment:
+    name: "Deploy to Cloud"
+    needs: cloud-artifact
+    uses: ./.github/workflows/cloud-deployment.yml
+    with:
+      artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
+      targetEnvironmentAlias: ${{ vars.TARGET_ENVIRONMENT_ALIAS }}
+      # Shipping a pre-built publish artifact — Cloud skips build/restore.
+      noBuildAndRestore: "true"
+      skipVersionCheck: "true"
+      skipPreserveUmbracoCloudJson: "false"
+      runSchemaExtraction: "true"
+      dockerImageTag: "0.3.119-beta"
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
