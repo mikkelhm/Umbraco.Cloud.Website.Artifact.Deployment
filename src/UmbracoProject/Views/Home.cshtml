@@ -1,0 +1,19 @@
+﻿@using Umbraco.Cms.Web.Common.PublishedModels;
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage<ContentModels.Home>
+@using ContentModels = Umbraco.Cms.Web.Common.PublishedModels;@{
+	Layout = null;
+}
+<html>
+	<body>
+		<h1>@Model.Name</h1>
+		<div>@Model.Value("body")</div>
+		<code>
+        @foreach (var header in Context.Request.Headers.OrderBy(h => h.Key))
+        {
+            <strong>@header.Key:</strong>
+                <em>@string.Join(" | ", header.Value.ToArray())</em><br/>
+        }
+</code>
+<h2>Request.Host: @Context.Request.Host</h2>
+	</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "Deploy": {
+    "Project": {
+      "Name": "YOUR PROJECT NAME",
+      "Alias": "your-project-alias",
+      "Id": "00000000-0000-0000-0000-000000000000",
+      "Workspaces": [
+        {
+          "Id": "00000000-0000-0000-0000-000000000000",
+          "Name": "Live",
+          "Type": "live",
+          "Url": "https://your-project-alias.euwest01.umbraco.io"
+        }
+      ]
+    },
+    "Settings": {}
+  },
+  "Identity": {
+    "AadInstancePath": "REPLACE-FROM-YOUR-CLOUD-PROJECT",
+    "ClientId": "00000000-0000-0000-0000-000000000000",
+    "EnvironmentId": "00000000-0000-0000-0000-000000000000",
+    "LocalLoginRedirectUri": "REPLACE-FROM-YOUR-CLOUD-PROJECT",
+    "Tenant": "REPLACE-FROM-YOUR-CLOUD-PROJECT",
+    "TenantId": "00000000-0000-0000-0000-000000000000"
+  }
+}
