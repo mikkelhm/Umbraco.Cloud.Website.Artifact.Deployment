@@ -4,13 +4,13 @@
     <CentralPackageFloatingVersionsEnabled>true</CentralPackageFloatingVersionsEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Umbraco.Cms" Version="17.6.0" />
-    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="17.5.3" />
+    <PackageVersion Include="Umbraco.Cms" Version="18.1.0" />
+    <PackageVersion Include="Umbraco.Cms.DevelopmentMode.Backoffice" Version="18.1.0" />
     <PackageVersion Include="Microsoft.ICU.ICU4C.Runtime" Version="72.1.0.3" />
-    <PackageVersion Include="Umbraco.Forms" Version="17.4.7" />
-    <PackageVersion Include="Umbraco.Forms.Deploy" Version="17.0.1" />
-    <PackageVersion Include="Umbraco.Deploy.Cloud" Version="17.2.1" />
-    <PackageVersion Include="Umbraco.Cloud.StorageProviders.AzureBlob" Version="17.1.0" />
-    <PackageVersion Include="Umbraco.Cloud.Cms" Version="17.2.2" />
+    <PackageVersion Include="Umbraco.Forms" Version="18.0.5" />
+    <PackageVersion Include="Umbraco.Forms.Deploy" Version="18.0.1" />
+    <PackageVersion Include="Umbraco.Deploy.Cloud" Version="18.0.1" />
+    <PackageVersion Include="Umbraco.Cloud.StorageProviders.AzureBlob" Version="18.0.0" />
+    <PackageVersion Include="Umbraco.Cloud.Cms" Version="18.0.2" />
   </ItemGroup>
 </Project>
