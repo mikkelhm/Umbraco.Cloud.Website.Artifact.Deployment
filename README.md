@@ -28,38 +28,24 @@ target environment, which means the same artifact can be promoted between enviro
 
 ## Runtime environment variables
 
-These are applied by Umbraco Cloud on the target environment. They replace what used to be committed
-into `umbraco-cloud.json` and `appsettings.json`.
+Environment-specific configuration is applied on the target environment rather than committed into
+the artifact. There are two distinct sources, and the difference matters.
 
-Deploy / project identity:
+### Injected by Umbraco Cloud — nothing for you to do
 
-| Environment variable | Notes |
-|---|---|
-| `Deploy__Project__Name` | Project display name |
-| `Deploy__Project__Alias` | Project alias |
-| `Deploy__Project__Id` | Project id (GUID) |
-| `Deploy__Project__Workspaces__0__Id` | Workspace / environment id |
-| `Deploy__Project__Workspaces__0__Name` | e.g. `Live` |
-| `Deploy__Project__Workspaces__0__Type` | e.g. `live` |
-| `Deploy__Project__Workspaces__0__Url` | Environment hostname |
-| `Deploy__Settings__ApiKey` | **Secret.** Umbraco Deploy API key |
+When Cloud provisions an environment it sets that environment's own configuration on the underlying
+app service: project and environment identifiers, blob storage, Redis, load balancing, and the
+**UmbracoID identity values** that back backoffice login. You do not set these, and you should not
+try to — they are managed by the platform and re-applied on its own terms.
 
-Umbraco ID / identity:
+The practical consequence: **backoffice login via UmbracoID works on a deployed environment out of
+the box.**
 
-| Environment variable | Notes |
-|---|---|
-| `Identity__AadInstancePath` | Identity stamp |
-| `Identity__ClientId` | |
-| `Identity__ClientSecret` | **Secret.** |
-| `Identity__EnvironmentId` | |
-| `Identity__LocalLoginRedirectUri` | |
-| `Identity__Tenant` | |
-| `Identity__TenantId` | |
-
-CMS settings and licenses:
+### Applied per environment — currently by tooling
 
 | Environment variable | Value / notes |
 |---|---|
+| `Umbraco__Cloud__Deploy__Settings__ApiKey` | **Secret.** Umbraco Deploy API key. Arbitrary value, but it must be *identical* across environments that need to recognise each other. |
 | `Umbraco__CMS__Imaging__HMACSecretKey` | **Secret.** |
 | `Umbraco__Licenses__Products__Umbraco.Deploy` | `UMBRACO-CLOUD` |
 | `Umbraco__Licenses__Products__Umbraco.Forms` | `UMBRACO-CLOUD` |
@@ -69,16 +55,24 @@ CMS settings and licenses:
 Only the *hierarchy separators* become double underscores. The dots inside `Umbraco.Deploy` and
 `Umbraco.Forms` are part of the key name and stay as-is — the same shape ASP.NET Core documents for
 [`Logging__LogLevel__Microsoft.Hosting.Lifetime`](https://learn.microsoft.com/aspnet/core/fundamentals/configuration/#how-hierarchical-configuration-data-is-organized).
-Array entries are indexed positionally, hence `Workspaces__0__Id`.
+Environment variable names bind case-insensitively, so casing differences between these and the
+platform's own settings are cosmetic.
 
-Note that `Deploy` and `Identity` are **root-level** configuration sections — they are not nested
-under `Umbraco`, which is why those variables have no `Umbraco__` prefix.
+`Deploy` and `Identity` are root-level sections **inside `umbraco-cloud.json`**, but that file is not
+an ASP.NET Core configuration source — its shape does not predict environment-variable names. The
+Deploy API key is `Umbraco__Cloud__Deploy__Settings__ApiKey`, not `Deploy__Settings__ApiKey`; assuming
+otherwise prevents the site from booting.
 
 ### Working locally
 
-Local development needs the same values. Until there is a supported way to fetch them for a project,
-set them as environment variables on your machine (or via user secrets / `launchSettings.json`) —
-do not commit them.
+A clone of this repo will **not** complete UmbracoID backoffice login locally. `umbraco-cloud.json`
+is committed with placeholder identity values (`REPLACE-FROM-YOUR-CLOUD-PROJECT`, all-zero GUIDs),
+and the platform-injected values that make login work on a deployed environment are not present on
+your machine.
+
+Replace those placeholders with your own project's values to develop locally. There is currently no
+supported way to fetch them for a project — providing one is a known gap. Whatever you use locally,
+do not commit real values.
 
 ---
 
