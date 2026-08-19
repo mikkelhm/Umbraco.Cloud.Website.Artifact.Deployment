@@ -1,0 +1,106 @@
+name: Pull request
+
+# Validates every pull request by building the same artifact the deployment
+# pipeline builds, and auto-merges Dependabot patch/minor bumps once that build
+# passes.
+#
+# Why the merge is a job with `needs: build`, and why it is a plain merge
+# rather than `gh pr merge --auto`:
+#
+# GitHub's own auto-merge feature is unavailable on a private repository on a
+# free plan -- PATCHing allow_auto_merge is silently ignored, and branch
+# protection answers "Upgrade to GitHub Pro or make this repository public".
+# Even where it is available, `--auto` waits only for checks that branch
+# protection *requires*, so with no protection it merges immediately regardless
+# of this build.
+#
+# `needs: build` provides the gate instead, at the job level: the merge step
+# cannot run unless the build job succeeded. That works on any plan, and it is
+# the actual guarantee wanted -- do not merge something that does not build.
+#
+# No secrets are used here, which is deliberate: Dependabot pull requests run
+# with the Dependabot secrets context and cannot read normal repository
+# secrets. The build must therefore stop short of uploading to Cloud.
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build artifact
+    # Windows to match cloud-artifact.yml -- a win-x64 publish cross-compiled
+    # from Linux has produced subtly broken output before, so a green check
+    # here has to mean the same thing the real pipeline means.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Same publish invocation as cloud-artifact.yml. Kept in step with that
+      # file by hand: this workflow deliberately does not reuse it, because
+      # doing so would mean loosening the required secrets on the workflow that
+      # performs real deployments.
+      - name: Publish site
+        shell: pwsh
+        run: |
+          dotnet publish src/UmbracoProject/UmbracoProject.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --no-self-contained `
+            --output "${{ github.workspace }}/publish" `
+            /p:UseAppHost=false
+
+      # Artifact size is a real failure mode, not a curiosity: Cloudflare
+      # rejected a previous portable publish with 413 Payload Too Large. A
+      # dependency bump that inflates the output would otherwise only surface
+      # at upload time, after the merge.
+      - name: Report artifact size
+        shell: pwsh
+        run: |
+          $publish = "${{ github.workspace }}/publish"
+          foreach ($d in 'cs','de','es','fr','it','ja','ko','pl','pt-BR','ru','tr','zh-Hans','zh-Hant') {
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $publish $d)
+          }
+          $sizeMB = [math]::Round((Get-ChildItem $publish -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+          Write-Host "Publish size after trim: $sizeMB MB"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Publish size after trim: **$sizeMB MB**"
+
+  merge:
+    name: Merge Dependabot patch and minor updates
+    needs: build
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      # update-type is one of version-update:semver-{patch,minor,major}. For a
+      # grouped pull request it reflects the largest bump in the group, so a
+      # group containing a major is not auto-merged.
+      - name: Merge
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --squash --delete-branch "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
