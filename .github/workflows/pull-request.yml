@@ -67,16 +67,34 @@ jobs:
       # rejected a previous portable publish with 413 Payload Too Large. A
       # dependency bump that inflates the output would otherwise only surface
       # at upload time, after the merge.
-      - name: Report artifact size
+      #
+      # The number that matters is the *zipped* size, since that is what gets
+      # uploaded -- the publish directory is roughly 3x larger (232 MB vs 74 MB
+      # on Umbraco 18), so reporting the directory would badly misrepresent the
+      # margin. Both are printed; only the zip is compared against the limit.
+      - name: Check artifact size
         shell: pwsh
         run: |
           $publish = "${{ github.workspace }}/publish"
           foreach ($d in 'cs','de','es','fr','it','ja','ko','pl','pt-BR','ru','tr','zh-Hans','zh-Hant') {
             Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $publish $d)
           }
-          $sizeMB = [math]::Round((Get-ChildItem $publish -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
-          Write-Host "Publish size after trim: $sizeMB MB"
-          Add-Content $env:GITHUB_STEP_SUMMARY "Publish size after trim: **$sizeMB MB**"
+          $publishMB = [math]::Round((Get-ChildItem $publish -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
+
+          $zipPath = "${{ github.workspace }}/sources.zip"
+          Compress-Archive -Path "$publish/*" -DestinationPath $zipPath -Force
+          $zipMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
+
+          Write-Host "Publish size after trim: $publishMB MB"
+          Write-Host "Zipped artifact: $zipMB MB"
+          Add-Content $env:GITHUB_STEP_SUMMARY "Zipped artifact: **$zipMB MB** (publish dir $publishMB MB)"
+
+          # 100 MB leaves headroom over the ~74 MB baseline while still failing
+          # well before the upload would. Raise deliberately, not reflexively.
+          if ($zipMB -gt 100) {
+            Write-Error "Zipped artifact is $zipMB MB, over the 100 MB guard. Cloudflare has rejected oversized uploads with 413."
+            exit 1
+          }
 
   merge:
     name: Merge Dependabot patch and minor updates
