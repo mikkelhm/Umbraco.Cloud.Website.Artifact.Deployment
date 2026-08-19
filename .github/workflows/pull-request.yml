@@ -42,7 +42,7 @@ jobs:
     # here has to mean the same thing the real pipeline means.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
