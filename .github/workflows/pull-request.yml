@@ -104,6 +104,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      # Required by the deploy dispatch below -- workflow_dispatch through the
+      # API needs actions: write, which contents/pull-requests do not imply.
+      actions: write
     steps:
       - name: Fetch Dependabot metadata
         id: metadata
@@ -115,6 +118,7 @@ jobs:
       # grouped pull request it reflects the largest bump in the group, so a
       # group containing a major is not auto-merged.
       - name: Merge
+        id: merge
         if: |
           steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
           steps.metadata.outputs.update-type == 'version-update:semver-minor'
@@ -122,3 +126,33 @@ jobs:
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Without this, an auto-merged update never deploys.
+      #
+      # GitHub does not run workflows for events raised by GITHUB_TOKEN -- the
+      # recursion guard. So the push this job just made to main does NOT start
+      # main.yml, and the bump sits merged but undeployed until some unrelated
+      # human push happens to carry it out. Confirmed on the template: the four
+      # bumps merged by a user account each produced a pipeline run; the three
+      # merged by this workflow produced none at all.
+      #
+      # workflow_dispatch is one of only two documented exceptions to that guard
+      # ("With the exception of workflow_dispatch and repository_dispatch, other
+      # GITHUB_TOKEN-triggered events do not create workflow runs at all"), so
+      # dispatching explicitly works with the built-in token and needs no PAT.
+      #
+      # Skipped when PROJECT_ID is absent, which is how the template repo itself
+      # is distinguished from a seeded project: the template has no Cloud project
+      # to deploy to, and dispatching there only manufactures a failing run.
+      - name: Deploy the merged update
+        if: steps.merge.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+        run: |
+          if [ -z "$PROJECT_ID" ]; then
+            echo "No PROJECT_ID secret: this is the template, not a seeded project. Nothing to deploy."
+            exit 0
+          fi
+          gh workflow run main.yml --ref main --repo "$GITHUB_REPOSITORY"
+          echo "Dispatched main.yml on main to deploy the merged update."
