@@ -14,3 +14,4 @@
     <PackageVersion Include="Umbraco.Cloud.Cms" Version="18.0.2" />
   </ItemGroup>
 </Project>
+<!-- throwaway: verifying checkout@v7 + setup-dotnet@v6 build the artifact -->
