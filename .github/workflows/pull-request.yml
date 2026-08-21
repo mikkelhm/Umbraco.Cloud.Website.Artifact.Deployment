@@ -141,18 +141,22 @@ jobs:
       # GITHUB_TOKEN-triggered events do not create workflow runs at all"), so
       # dispatching explicitly works with the built-in token and needs no PAT.
       #
-      # Skipped when PROJECT_ID is absent, which is how the template repo itself
-      # is distinguished from a seeded project: the template has no Cloud project
-      # to deploy to, and dispatching there only manufactures a failing run.
+      # Dispatched unconditionally. An earlier version guarded this on
+      # `secrets.PROJECT_ID` being non-empty, to avoid dispatching on the
+      # template — which silently disabled the whole thing, because a workflow
+      # triggered by a Dependabot pull request reads the *Dependabot* secrets
+      # store, not Actions secrets. PROJECT_ID was therefore always empty here,
+      # on seeded projects too, and every merge reported
+      # "this is the template, not a seeded project" and deployed nothing.
+      #
+      # No guard is needed now: main.yml skips its own jobs unless
+      # TARGET_ENVIRONMENT_ALIAS is set, so dispatching on the template costs a
+      # skipped run rather than a failed one. Do not reintroduce a secrets-based
+      # condition in this job — secrets are not what they appear to be here.
       - name: Deploy the merged update
         if: steps.merge.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PROJECT_ID: ${{ secrets.PROJECT_ID }}
         run: |
-          if [ -z "$PROJECT_ID" ]; then
-            echo "No PROJECT_ID secret: this is the template, not a seeded project. Nothing to deploy."
-            exit 0
-          fi
           gh workflow run main.yml --ref main --repo "$GITHUB_REPOSITORY"
           echo "Dispatched main.yml on main to deploy the merged update."

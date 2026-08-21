@@ -11,6 +11,19 @@ jobs:
   # Pack and upload the deployment Artifact
   cloud-artifact:
     name: "Prepare and Upload Artifact"
+    # Only run where a Cloud project is actually configured.
+    #
+    # TARGET_ENVIRONMENT_ALIAS is a repository *variable*, set when a repo is
+    # seeded from this template. The template itself has no Cloud project, so
+    # every push to it started a pipeline that could only fail at the upload
+    # with a 401 -- ten of them before this guard existed. Skipping is the
+    # honest outcome: nothing to deploy to.
+    #
+    # A variable rather than the PROJECT_ID secret because `secrets` is not
+    # available to a job-level `if` at all, while `vars` is. Deployment cannot
+    # work without this value regardless -- it is passed as
+    # targetEnvironmentAlias below -- so its absence is a precise test.
+    if: vars.TARGET_ENVIRONMENT_ALIAS != ''
     uses: ./.github/workflows/cloud-artifact.yml
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
@@ -24,6 +37,7 @@ jobs:
   cloud-deployment:
     name: "Deploy to Cloud"
     needs: cloud-artifact
+    if: vars.TARGET_ENVIRONMENT_ALIAS != ''
     uses: ./.github/workflows/cloud-deployment.yml
     with:
       artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
