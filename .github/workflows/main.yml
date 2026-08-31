@@ -47,7 +47,7 @@ jobs:
       skipVersionCheck: "true"
       skipPreserveUmbracoCloudJson: "false"
       runSchemaExtraction: "true"
-      dockerImageTag: "0.3.119-beta"
+      dockerImageTag: "0.3.131-beta"
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
