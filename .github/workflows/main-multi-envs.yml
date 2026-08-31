@@ -1,0 +1,191 @@
+name: pipeline (multiple environments)
+
+# SAMPLE — a multi-environment version of main.yml.
+#
+# One artifact is built and uploaded once, then promoted through every
+# environment by id. The bytes verified on dev are the bytes that reach live;
+# nothing is rebuilt or re-uploaded between hops.
+#
+#   cloud-artifact ─> deploy-dev ─> approve-stage ⏸ ─> deploy-stage ─> approve-live ⏸ ─> deploy-live
+#         │                                                                                  ▲
+#         └────────────────────────── same artifactId ───────────────────────────────────────┘
+#
+# ── Using this file ──────────────────────────────────────────────────────────
+#
+# It is dispatch-only on purpose. main.yml already triggers on push to main, so
+# if this one did too, every push would start two pipelines deploying to the
+# same environment at once - which Cloud rejects with
+# "Zip deploy returned status Conflict". Pick one:
+#
+#   * keep both, and run this one by hand from the Actions tab, or
+#   * adopt this as your pipeline: uncomment the push trigger below AND remove
+#     the push trigger from main.yml (or delete main.yml).
+#
+# Repository variables it reads:
+#
+#   TARGET_ENVIRONMENT_ALIAS    first environment, already set when the repo was
+#                               seeded (typically "dev")
+#   STAGE_ENVIRONMENT_ALIAS     middle environment, e.g. "stage"  ← you add this
+#   LIVE_ENVIRONMENT_ALIAS      final environment, e.g. "live"    ← you add this
+#   UMBRACO_CLOUD_API_BASE_URL  already set when the repo was seeded
+#
+# Fewer than three environments? Delete the stages you do not have and rewire
+# the `needs:` of whatever now comes last. Two environments is the shape in
+# main.yml's sibling sample; the chain generalises to as many as you like.
+
+on:
+  workflow_dispatch: # Run this pipeline manually from the Actions tab
+
+  # Uncomment to deploy on every push to main — and remove the push trigger
+  # from main.yml first, or both pipelines will deploy at once.
+  #
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  # Build and upload the deployment artifact exactly once. Every environment
+  # below deploys this same artifact id.
+  cloud-artifact:
+    name: "Prepare and Upload Artifact"
+    # Only run where a Cloud project is actually configured. `secrets` is not
+    # available to a job-level `if` at all, while `vars` is, so the alias
+    # variable is the test - deployment cannot work without it regardless.
+    if: vars.TARGET_ENVIRONMENT_ALIAS != ''
+    uses: ./.github/workflows/cloud-artifact.yml
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
+
+  # ── Environment 1: dev ──────────────────────────────────────────────────────
+  deploy-dev:
+    name: "Deploy to Cloud (dev)"
+    needs: cloud-artifact
+    if: vars.TARGET_ENVIRONMENT_ALIAS != ''
+    uses: ./.github/workflows/cloud-deployment.yml
+    with:
+      artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
+      targetEnvironmentAlias: ${{ vars.TARGET_ENVIRONMENT_ALIAS }}
+      # Shipping a pre-built publish artifact — Cloud skips build/restore.
+      noBuildAndRestore: "true"
+      skipVersionCheck: "true"
+      skipPreserveUmbracoCloudJson: "false"
+      runSchemaExtraction: "true"
+      dockerImageTag: "0.3.131-beta"
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
+
+  # ── Gate before stage ───────────────────────────────────────────────────────
+  #
+  # This job deploys nothing. It exists only to hold the run at an Environment
+  # protection rule: a job that calls a reusable workflow (`uses:`) cannot
+  # reliably carry `environment:` itself, so the approval is parked on a plain
+  # `runs-on` job and the deploy below simply `needs:` it.
+  #
+  # Set up in GitHub: Settings → Environments → New environment named to match
+  # STAGE_ENVIRONMENT_ALIAS → Required reviewers.
+  #
+  # ⚠ Required reviewers are NOT available on private repositories on the Free
+  #   plan, and repositories seeded from this template are private. On a Free
+  #   private repo this job runs straight through without pausing, so the
+  #   promotion is not actually gated. Options: make the repository public,
+  #   upgrade the plan, or use the dispatch-input variant at the bottom of this
+  #   file.
+  #
+  # Reaching this job only proves the dev *deployment* reported success — not
+  # that the dev site behaves. Checking that is the reviewer's job.
+  approve-stage:
+    name: "Await approval for stage"
+    needs: [cloud-artifact, deploy-dev]
+    if: vars.STAGE_ENVIRONMENT_ALIAS != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ vars.STAGE_ENVIRONMENT_ALIAS }}
+    steps:
+      - name: Record the artifact being promoted
+        run: |
+          echo "Promoting artifact ${{ needs.cloud-artifact.outputs.artifactId }}"
+          echo "from '${{ vars.TARGET_ENVIRONMENT_ALIAS }}' to '${{ vars.STAGE_ENVIRONMENT_ALIAS }}'"
+
+  # ── Environment 2: stage ────────────────────────────────────────────────────
+  deploy-stage:
+    name: "Deploy to Cloud (stage)"
+    needs: [cloud-artifact, approve-stage]
+    if: vars.STAGE_ENVIRONMENT_ALIAS != ''
+    uses: ./.github/workflows/cloud-deployment.yml
+    with:
+      # The same artifact id dev deployed - not a rebuild.
+      artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
+      targetEnvironmentAlias: ${{ vars.STAGE_ENVIRONMENT_ALIAS }}
+      noBuildAndRestore: "true"
+      skipVersionCheck: "true"
+      skipPreserveUmbracoCloudJson: "false"
+      runSchemaExtraction: "true"
+      dockerImageTag: "0.3.131-beta"
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
+
+  # ── Gate before live ────────────────────────────────────────────────────────
+  approve-live:
+    name: "Await approval for live"
+    needs: [cloud-artifact, deploy-stage]
+    if: vars.LIVE_ENVIRONMENT_ALIAS != ''
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ vars.LIVE_ENVIRONMENT_ALIAS }}
+    steps:
+      - name: Record the artifact being promoted
+        run: |
+          echo "Promoting artifact ${{ needs.cloud-artifact.outputs.artifactId }}"
+          echo "from '${{ vars.STAGE_ENVIRONMENT_ALIAS }}' to '${{ vars.LIVE_ENVIRONMENT_ALIAS }}'"
+
+  # ── Environment 3: live ─────────────────────────────────────────────────────
+  deploy-live:
+    name: "Deploy to Cloud (live)"
+    needs: [cloud-artifact, approve-live]
+    if: vars.LIVE_ENVIRONMENT_ALIAS != ''
+    uses: ./.github/workflows/cloud-deployment.yml
+    with:
+      # Still the very same artifact id built at the top of this run.
+      artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
+      targetEnvironmentAlias: ${{ vars.LIVE_ENVIRONMENT_ALIAS }}
+      noBuildAndRestore: "true"
+      skipVersionCheck: "true"
+      skipPreserveUmbracoCloudJson: "false"
+      runSchemaExtraction: "true"
+      dockerImageTag: "0.3.131-beta"
+    secrets:
+      projectId: ${{ secrets.PROJECT_ID }}
+      umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
+
+# ── Alternative gate: no Environment protection rules ─────────────────────────
+#
+# If the repository cannot use required reviewers (private repo on the Free
+# plan), gate on a dispatch input instead. You choose how far to promote when
+# you start the run, rather than after seeing each environment - weaker, but it
+# works on any plan and needs no Environment setup.
+#
+# Replace the trigger with:
+#
+#   on:
+#     workflow_dispatch:
+#       inputs:
+#         promote_to:
+#           description: 'Promote as far as'
+#           required: true
+#           default: dev
+#           type: choice
+#           options: [dev, stage, live]
+#
+# then delete the approve-* jobs and gate each deploy on the input, wiring the
+# `needs:` of each deploy job to the previous deploy job instead of its gate:
+#
+#   deploy-stage:
+#     needs: [cloud-artifact, deploy-dev]
+#     if: contains(fromJSON('["stage","live"]'), inputs.promote_to)
+#
+#   deploy-live:
+#     needs: [cloud-artifact, deploy-stage]
+#     if: inputs.promote_to == 'live'

@@ -201,6 +201,44 @@ dotnet add .\src\MyAwesomeProject.Web\MyAwesomeProject.Web.csproj reference .\sr
 If you are using a CI/CD tool such as Azure DevOps or GitHub Actions, you can use the following documentation to set it up to deploy your Umbraco Cloud project.
 [Umbraco Cloud CI/CD flow](https://docs.umbraco.com/umbraco-cloud/set-up/project-settings/umbraco-cicd)
 
+## Pipelines in this repository
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| `main.yml` | push to `main` | Builds one artifact and deploys it to `TARGET_ENVIRONMENT_ALIAS`. |
+| `main-multi-envs.yml` | manual | **Sample.** Builds one artifact and promotes it through dev → stage → live, pausing for approval before each promotion. |
+| `pull-request.yml` | pull request | Builds the site to check the PR compiles. |
+| `cloud-artifact.yml` / `cloud-deployment.yml` | called | Reusable building blocks the pipelines above call. |
+
+### Promoting through multiple environments
+
+`main-multi-envs.yml` is a worked example of deploying one artifact to several
+environments. It uploads the artifact once and passes the **same artifact id** to each
+deployment, so the code verified on dev is byte-for-byte the code that reaches live -
+nothing is rebuilt between hops, and the ~75 MB zip is uploaded once rather than three
+times.
+
+It is **manual-trigger only**. `main.yml` already deploys on every push to `main`, so if
+both ran on push you would get two pipelines deploying at once and Cloud would reject one
+with `Zip deploy returned status Conflict`. To adopt it as your pipeline, uncomment its
+push trigger *and* remove the push trigger from `main.yml`.
+
+To use it, add two repository variables alongside the ones set when the repo was created:
+
+| Variable | Example |
+|---|---|
+| `STAGE_ENVIRONMENT_ALIAS` | `stage` |
+| `LIVE_ENVIRONMENT_ALIAS` | `live` |
+
+The pauses use GitHub Environments with required reviewers. **Required reviewers are not
+available on private repositories on the Free plan** - and repositories created from this
+template are private, so on a Free plan the approval jobs run straight through without
+pausing and the promotion is not gated. Make the repository public, upgrade the plan, or
+use the dispatch-input alternative documented at the bottom of the workflow file.
+
+Fewer than three environments? Delete the stages you do not have and rewire the `needs:`
+of whatever now comes last.
+
 
 # Documentation
 
