@@ -41,7 +41,7 @@ on:
         type: string
         default: "true"
       dockerImageTag:
-        description: 'Docker image tag used by the Cloud update executor (zip-deploy flow)'
+        description: 'Optional: pin a specific Cloud executor image. Leave empty and Cloud picks the image matching the project setup.'
         required: false
         type: string
         default: ""

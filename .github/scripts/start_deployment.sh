@@ -15,8 +15,9 @@ pipelineVendor="${10}"
 # Not required, defaults to https://api.cloud.umbraco.com
 baseUrl="${11:-https://api.cloud.umbraco.com}"
 
-# Optional — identifies the container image used to execute the deployment on Cloud.
-# Required when deploying a pre-built publish artifact (zip-deploy flow).
+# Optional — pins the container image Cloud uses to execute the deployment.
+# Leave empty (the default): Cloud then picks the executor image that matches
+# how the project is set up, and the property is omitted from the request body.
 dockerImageTag="${12:-}"
 
 
@@ -35,7 +36,7 @@ function call_api {
   echo " - noBuildAndRestore: $noBuildAndRestore"
   echo " - skipVersionCheck: $skipVersionCheck"
   echo " - runSchemaExtraction: $runSchemaExtraction"
-  echo " - dockerImageTag: $dockerImageTag"
+  echo " - dockerImageTag: ${dockerImageTag:-<omitted, Cloud picks the executor>}"
 
   body=$(jq -n \
     --arg targetEnvironmentAlias "$targetEnvironmentAlias" \
@@ -53,9 +54,9 @@ function call_api {
       noBuildAndRestore: $noBuildAndRestore,
       skipVersionCheck: $skipVersionCheck,
       runSchemaExtraction: $runSchemaExtraction,
-      skipPreserveUmbracoCloudJson: $skipPreserveUmbracoCloudJson,
-      dockerImageTag: $dockerImageTag
-    }')
+      skipPreserveUmbracoCloudJson: $skipPreserveUmbracoCloudJson
+    }
+    | if $dockerImageTag != "" then . + {dockerImageTag: $dockerImageTag} else . end')
 
   response=$(curl -s -w "%{http_code}" -X POST $url \
     -H "Umbraco-Cloud-Api-Key: $apiKey" \

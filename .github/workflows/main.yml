@@ -47,7 +47,8 @@ jobs:
       skipVersionCheck: "true"
       skipPreserveUmbracoCloudJson: "false"
       runSchemaExtraction: "true"
-      dockerImageTag: "0.3.131-beta"
+      # No dockerImageTag: Cloud picks the executor image that matches how the
+      # project is set up. Only pass it to pin a specific image on purpose.
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
