@@ -47,8 +47,9 @@ jobs:
       skipVersionCheck: "true"
       skipPreserveUmbracoCloudJson: "false"
       runSchemaExtraction: "true"
-      # No dockerImageTag: Cloud picks the executor image that matches how the
-      # project is set up. Only pass it to pin a specific image on purpose.
+      # Cloud picks the executor image family from the project type; the tag
+      # selects the channel. The artifact executor is only published as beta.
+      dockerImageTag: "latest-beta"
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
