@@ -11,6 +11,6 @@
     <PackageVersion Include="Umbraco.Forms.Deploy" Version="18.0.1" />
     <PackageVersion Include="Umbraco.Deploy.Cloud" Version="18.0.1" />
     <PackageVersion Include="Umbraco.Cloud.StorageProviders.AzureBlob" Version="18.0.0" />
-    <PackageVersion Include="Umbraco.Cloud.Cms" Version="18.0.2" />
+    <PackageVersion Include="Umbraco.Cloud.Cms" Version="18.0.3" />
   </ItemGroup>
 </Project>
