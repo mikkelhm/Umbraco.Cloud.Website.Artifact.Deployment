@@ -15,9 +15,7 @@ on:
 jobs:
   prepareDeployment:
     name: Prepare Artifact to cloud
-    # Windows runner so the -r win-x64 publish is built in a matching platform
-    # environment. Avoids subtle cross-compile issues (e.g. SqlClient native
-    # pairing) seen when publishing Windows-RID assets from Linux.
+    # Windows runner to match the Windows App Service the artifact runs on.
     runs-on: windows-latest
     outputs:
       artifactId: ${{ steps.upload-artifact.outputs.artifactId }}
@@ -29,52 +27,18 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # No secrets are injected into config files here. Everything that used to be
-      # written in at build time — the Deploy API key, the Identity client secret,
-      # the imaging HMAC key, and the license products — is applied by Umbraco Cloud
-      # as environment variables on the target environment instead. The artifact is
-      # therefore environment-agnostic and carries no per-environment configuration.
-
-      # Publish framework-dependent for win-x64 (Cloud runs on Windows App
-      # Service). Smaller than portable (~72 MB vs ~143 MB) which matters —
-      # Cloudflare returned 413 Payload Too Large on the portable attempt.
-      # SqlClientFactory.Instance=null seen previously on this output is
-      # addressed by pinning Microsoft.Data.SqlClient 7.0 in UmbracoProject.csproj.
+      # No secrets are injected into config files. The Deploy API key, the Identity
+      # client secret, the imaging HMAC key and the license products are all applied
+      # by Umbraco Cloud as environment variables on the target environment. The
+      # artifact is environment-agnostic and carries no per-environment configuration.
       - name: Publish site
         shell: pwsh
         run: |
           dotnet publish src/UmbracoProject/UmbracoProject.csproj `
             --configuration Release `
-            --runtime win-x64 `
             --no-self-contained `
             --output "${{ github.workspace }}/publish" `
             /p:UseAppHost=false
-
-      # Enable stdout logging in web.config so any startup crash writes to
-      # site/wwwroot/logs/stdout_*.log (visible in Kudu). ANCM only dumps
-      # this once at process startup, which is exactly when we crashed.
-      - name: Enable stdout logging in web.config
-        shell: pwsh
-        run: |
-          $cfg = "${{ github.workspace }}/publish/web.config"
-          [xml]$doc = Get-Content $cfg
-          $ancm = $doc.configuration.location.'system.webServer'.aspNetCore
-          $ancm.stdoutLogEnabled = "true"
-          $doc.Save($cfg)
-          Write-Host "--- web.config ---"
-          Get-Content $cfg
-
-      # Trim satellite resource assemblies for locales we don't serve — each
-      # locale folder ships ~1MB of .resources.dll assemblies. Keeps default (en).
-      - name: Trim unused locale satellites
-        shell: pwsh
-        run: |
-          $publish = "${{ github.workspace }}/publish"
-          foreach ($d in 'cs','de','es','fr','it','ja','ko','pl','pt-BR','ru','tr','zh-Hans','zh-Hant') {
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $publish $d)
-          }
-          $sizeMB = [math]::Round((Get-ChildItem $publish -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
-          Write-Host "Publish size after trim: $sizeMB MB"
 
       # Zip the publish output for upload.
       - name: Zip publish output

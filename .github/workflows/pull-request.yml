@@ -37,9 +37,8 @@ concurrency:
 jobs:
   build:
     name: Build artifact
-    # Windows to match cloud-artifact.yml -- a win-x64 publish cross-compiled
-    # from Linux has produced subtly broken output before, so a green check
-    # here has to mean the same thing the real pipeline means.
+    # Windows to match cloud-artifact.yml, so a green check here means the
+    # same thing the real pipeline means.
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -58,38 +57,34 @@ jobs:
         run: |
           dotnet publish src/UmbracoProject/UmbracoProject.csproj `
             --configuration Release `
-            --runtime win-x64 `
             --no-self-contained `
             --output "${{ github.workspace }}/publish" `
             /p:UseAppHost=false
 
-      # Artifact size is a real failure mode, not a curiosity: Cloudflare
-      # rejected a previous portable publish with 413 Payload Too Large. A
-      # dependency bump that inflates the output would otherwise only surface
-      # at upload time, after the merge.
+      # Artifact size is a real failure mode: the upload endpoint rejects
+      # oversized artifacts with 413 Payload Too Large. A dependency bump that
+      # inflates the output would otherwise only surface at upload time, after
+      # the merge.
       #
       # The number that matters is the *zipped* size, since that is what gets
-      # uploaded -- the publish directory is roughly 3x larger (232 MB vs 74 MB
-      # on Umbraco 18), so reporting the directory would badly misrepresent the
-      # margin. Both are printed; only the zip is compared against the limit.
+      # uploaded -- the publish directory is several times larger, so reporting
+      # it would misrepresent the margin. Both are printed; only the zip is
+      # compared against the limit.
       - name: Check artifact size
         shell: pwsh
         run: |
           $publish = "${{ github.workspace }}/publish"
-          foreach ($d in 'cs','de','es','fr','it','ja','ko','pl','pt-BR','ru','tr','zh-Hans','zh-Hant') {
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue (Join-Path $publish $d)
-          }
           $publishMB = [math]::Round((Get-ChildItem $publish -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 1)
 
           $zipPath = "${{ github.workspace }}/sources.zip"
           Compress-Archive -Path "$publish/*" -DestinationPath $zipPath -Force
           $zipMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 1)
 
-          Write-Host "Publish size after trim: $publishMB MB"
+          Write-Host "Publish size: $publishMB MB"
           Write-Host "Zipped artifact: $zipMB MB"
           Add-Content $env:GITHUB_STEP_SUMMARY "Zipped artifact: **$zipMB MB** (publish dir $publishMB MB)"
 
-          # 100 MB leaves headroom over the ~74 MB baseline while still failing
+          # 100 MB leaves headroom over a normal publish while still failing
           # well before the upload would. Raise deliberately, not reflexively.
           if ($zipMB -gt 100) {
             Write-Error "Zipped artifact is $zipMB MB, over the 100 MB guard. Cloudflare has rejected oversized uploads with 413."
