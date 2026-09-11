@@ -20,31 +20,6 @@ on:
         description: 'The target environment alias to deploy to'
         required: true
         type: string
-      noBuildAndRestore:
-        description: 'Skip build and restore steps'
-        required: false
-        type: string
-        default: "false"
-      skipVersionCheck:
-        description: 'Skip version check'
-        required: false
-        type: string
-        default: "false"
-      skipPreserveUmbracoCloudJson:
-        description: 'Skip preserving umbraco-cloud.json file'
-        required: false
-        type: string
-        default: "false"
-      runSchemaExtraction:
-        description: 'Run schema extraction during deployment'
-        required: false
-        type: string
-        default: "true"
-      dockerImageTag:
-        description: 'Optional: pin a specific Cloud executor image. Leave empty and Cloud picks the image matching the project setup.'
-        required: false
-        type: string
-        default: ""
 
     secrets:
       projectId:
@@ -74,13 +49,8 @@ jobs:
           ${{ inputs.artifactId }}
           ${{ inputs.targetEnvironmentAlias }}
           "Run for ${{ github.run_number }}"
-          ${{ inputs.skipPreserveUmbracoCloudJson }}
-          ${{ inputs.noBuildAndRestore }}
-          ${{ inputs.skipVersionCheck }}
-          ${{ inputs.runSchemaExtraction }}
           GITHUB
           "${{ vars.UMBRACO_CLOUD_API_BASE_URL }}"
-          "${{ inputs.dockerImageTag }}"
 
   awaitDeploymentFinished:
     name: Await deployment to finish

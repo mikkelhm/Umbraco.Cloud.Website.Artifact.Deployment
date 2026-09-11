@@ -66,12 +66,6 @@ jobs:
     with:
       artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
       targetEnvironmentAlias: ${{ vars.TARGET_ENVIRONMENT_ALIAS }}
-      # Shipping a pre-built publish artifact — Cloud skips build/restore.
-      noBuildAndRestore: "true"
-      skipVersionCheck: "true"
-      skipPreserveUmbracoCloudJson: "false"
-      runSchemaExtraction: "true"
-      dockerImageTag: "latest-beta"
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
@@ -118,11 +112,6 @@ jobs:
       # The same artifact id dev deployed - not a rebuild.
       artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
       targetEnvironmentAlias: ${{ vars.STAGE_ENVIRONMENT_ALIAS }}
-      noBuildAndRestore: "true"
-      skipVersionCheck: "true"
-      skipPreserveUmbracoCloudJson: "false"
-      runSchemaExtraction: "true"
-      dockerImageTag: "latest-beta"
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}
@@ -151,11 +140,6 @@ jobs:
       # Still the very same artifact id built at the top of this run.
       artifactId: ${{ needs.cloud-artifact.outputs.artifactId }}
       targetEnvironmentAlias: ${{ vars.LIVE_ENVIRONMENT_ALIAS }}
-      noBuildAndRestore: "true"
-      skipVersionCheck: "true"
-      skipPreserveUmbracoCloudJson: "false"
-      runSchemaExtraction: "true"
-      dockerImageTag: "latest-beta"
     secrets:
       projectId: ${{ secrets.PROJECT_ID }}
       umbracoCloudApiKey: ${{ secrets.UMBRACO_CLOUD_API_KEY }}

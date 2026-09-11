@@ -6,20 +6,10 @@ apiKey="$2"
 artifactId="$3"
 targetEnvironmentAlias="$4"
 commitMessage="$5"
-skipPreserveUmbracoCloudJson="${6:-false}"
-noBuildAndRestore="${7:-false}"
-skipVersionCheck="${8:-false}"
-runSchemaExtraction="${9:-true}"
-pipelineVendor="${10}"
+pipelineVendor="${6}"
 
 # Not required, defaults to https://api.cloud.umbraco.com
-baseUrl="${11:-https://api.cloud.umbraco.com}"
-
-# Optional — pins the container image Cloud uses to execute the deployment.
-# Leave empty (the default): Cloud then picks the executor image that matches
-# how the project is set up, and the property is omitted from the request body.
-dockerImageTag="${12:-}"
-
+baseUrl="${7:-https://api.cloud.umbraco.com}"
 
 ### Endpoint docs
 # https://docs.umbraco.com/umbraco-cloud/set-up/project-settings/umbraco-cicd/umbracocloudapi/todo-v2
@@ -32,31 +22,17 @@ function call_api {
   echo " - targetEnvironmentAlias: $targetEnvironmentAlias"
   echo " - artifactId: $artifactId"
   echo " - commitMessage: $commitMessage"
-  echo " - skipPreserveUmbracoCloudJson: $skipPreserveUmbracoCloudJson"
-  echo " - noBuildAndRestore: $noBuildAndRestore"
-  echo " - skipVersionCheck: $skipVersionCheck"
-  echo " - runSchemaExtraction: $runSchemaExtraction"
-  echo " - dockerImageTag: ${dockerImageTag:-<omitted, Cloud picks the executor>}"
+  echo " - pipelineVendor: $pipelineVendor"
 
   body=$(jq -n \
     --arg targetEnvironmentAlias "$targetEnvironmentAlias" \
     --arg artifactId "$artifactId" \
     --arg commitMessage "$commitMessage" \
-    --arg dockerImageTag "$dockerImageTag" \
-    --argjson noBuildAndRestore "$noBuildAndRestore" \
-    --argjson skipVersionCheck "$skipVersionCheck" \
-    --argjson runSchemaExtraction "$runSchemaExtraction" \
-    --argjson skipPreserveUmbracoCloudJson "$skipPreserveUmbracoCloudJson" \
     '{
       targetEnvironmentAlias: $targetEnvironmentAlias,
       artifactId: $artifactId,
-      commitMessage: $commitMessage,
-      noBuildAndRestore: $noBuildAndRestore,
-      skipVersionCheck: $skipVersionCheck,
-      runSchemaExtraction: $runSchemaExtraction,
-      skipPreserveUmbracoCloudJson: $skipPreserveUmbracoCloudJson
-    }
-    | if $dockerImageTag != "" then . + {dockerImageTag: $dockerImageTag} else . end')
+      commitMessage: $commitMessage
+    }')
 
   response=$(curl -s -w "%{http_code}" -X POST $url \
     -H "Umbraco-Cloud-Api-Key: $apiKey" \
