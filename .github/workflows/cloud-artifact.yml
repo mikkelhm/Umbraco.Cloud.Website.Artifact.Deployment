@@ -18,7 +18,7 @@ jobs:
     # Windows runner to match the Windows App Service the artifact runs on.
     runs-on: windows-latest
     outputs:
-      artifactId: ${{ steps.upload-artifact.outputs.artifactId }}
+      artifactId: ${{ steps.upload-artifact.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
 
@@ -57,24 +57,19 @@ jobs:
           path: ${{ github.workspace }}/sources.zip
           retention-days: 1
 
-      # Upload the zipped artifact with the v3 direct-to-storage flow: the script asks
-      # the Cloud API for a write-only blob SAS url, PUTs the zip straight to Azure Blob
-      # Storage (in blocks, with checksums) and then asks the API to verify and complete
-      # the artifact. The zip never travels through the API itself, so the 100 MB
-      # Cloudflare request limit that capped the old v2 upload does not apply; the
-      # ceiling is the 2 GiB the complete endpoint enforces.
-      # Paths are relative because ${{ github.workspace }} expands to a Windows
-      # path with backslashes, which bash interprets as escape sequences when
-      # unquoted in the folded command.
+      # Upload the zipped artifact to Umbraco Cloud. The action wraps the v3
+      # direct-to-storage flow (upload url -> PUT to blob storage in checksummed
+      # blocks -> complete), so the zip never travels through the Cloud API and
+      # the 100 MB request limit of the old v2 upload does not apply. The ceiling
+      # is 2 GiB. This pipeline only passes parameters; how the upload is done is
+      # the action's concern.
       - name: Upload Artifact to Cloud
         id: upload-artifact
-        shell: bash
-        run: |
-          bash ./.github/scripts/upload_artifact.sh \
-            "${{ secrets.projectId }}" \
-            "${{ secrets.umbracoCloudApiKey }}" \
-            "./sources.zip" \
-            "Artifact for ${{ github.run_number }}" \
-            "${{ github.run_number }}" \
-            GITHUB \
-            "${{ vars.UMBRACO_CLOUD_API_BASE_URL }}"
+        uses: mikkelhm/umbraco-cloud-actions/upload-artifact@v1
+        with:
+          project-id: ${{ secrets.projectId }}
+          api-key: ${{ secrets.umbracoCloudApiKey }}
+          path: sources.zip
+          description: "Artifact for ${{ github.run_number }}"
+          version: ${{ github.run_number }}
+          base-url: ${{ vars.UMBRACO_CLOUD_API_BASE_URL || 'https://api.cloud.umbraco.com' }}

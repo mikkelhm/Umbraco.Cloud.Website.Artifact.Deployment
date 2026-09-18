@@ -11,16 +11,13 @@ Dont use unless you know what you are doing.
 by artifact id. Repository secrets `PROJECT_ID` and `UMBRACO_CLOUD_API_KEY` and the variable
 `TARGET_ENVIRONMENT_ALIAS` are required; `UMBRACO_CLOUD_API_BASE_URL` optionally overrides the API host.
 
-The upload (`.github/scripts/upload_artifact.sh`) uses the **v3 direct-to-storage** endpoints:
+The upload and the deployment are done by two GitHub Actions from
+[mikkelhm/umbraco-cloud-actions](https://github.com/mikkelhm/umbraco-cloud-actions) (work in progress):
 
-1. `POST /v3/projects/{projectId}/deployments/artifacts/upload-url` returns a pending `artifactId` and a
-   short-lived, write-only blob SAS url.
-2. The zip is `PUT` straight to Azure Blob Storage, as one request for small files and as
-   Put Block + Put Block List (8 MiB blocks, per-block `Content-MD5`, retried) for anything larger.
-3. `POST /v3/projects/{projectId}/deployments/artifacts/{artifactId}/complete` with the file's base64
-   md5 makes Cloud verify the stored content and finalise the artifact.
+- `upload-artifact` uploads the zip with the v3 direct-to-storage flow and outputs the `artifact-id`.
+  The zip never travels through the Cloud API, so the 100 MB request limit of the old v2 upload does
+  not apply. The ceiling is 2 GiB.
+- `deploy` starts the deployment of that artifact on the target environment and waits for it to finish.
 
-The zip never travels through the Cloud API, so the 100 MB Cloudflare request limit that capped the
-v2 upload endpoint does not apply. The ceiling is the 2 GiB the complete endpoint enforces. The SAS url
-is a credential and is masked in the pipeline log. Set `UMBRACO_CLOUD_UPLOAD_BLOCK_SIZE_MB` to change
-the block size.
+The workflows in this repo only pass parameters to those actions. How the Cloud API is called is the
+actions' concern, so API changes do not require touching this pipeline.

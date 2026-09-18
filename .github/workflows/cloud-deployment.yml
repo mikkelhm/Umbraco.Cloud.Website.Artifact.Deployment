@@ -28,46 +28,20 @@ on:
         required: true
 
 jobs:
-  startDeployment:
-    name: Start Deployment
+  deploy:
+    name: Deploy to Cloud
     runs-on: ubuntu-latest
-    outputs:
-      runningDeploymentId: ${{ steps.requestStartDeployment.outputs.deploymentId }}
     steps:
-      - uses: actions/checkout@v7
-
-      # Request to prepare a deployment
-      # - sets the commit message to be used in cloud 
-      # - supplies you with a deploymentId to be used in the rest of the process
-      - name: Request Start Deployment
-        id: requestStartDeployment
-        shell: bash
-        run: >
-          bash ${{ GITHUB.WORKSPACE }}/.github/scripts/start_deployment.sh
-          ${{ secrets.projectId }}
-          ${{ secrets.umbracoCloudApiKey }}
-          ${{ inputs.artifactId }}
-          ${{ inputs.targetEnvironmentAlias }}
-          "Run for ${{ github.run_number }}"
-          GITHUB
-          "${{ vars.UMBRACO_CLOUD_API_BASE_URL }}"
-
-  awaitDeploymentFinished:
-    name: Await deployment to finish
-    runs-on: ubuntu-latest
-    needs: startDeployment
-    steps:
-      - uses: actions/checkout@v7
-
-      # Poll until deployment finishes 
-      - name: Wait for deployment completed
-        shell: bash
-        env: 
-          runningDeploymentId: ${{ needs.startDeployment.outputs.runningDeploymentId }}
-        run: >
-          bash ${{ GITHUB.WORKSPACE }}/.github/scripts/get_deployment_status.sh
-          ${{ secrets.projectId }}
-          ${{ secrets.umbracoCloudApiKey }}
-          ${{ env.runningDeploymentId }}
-          ""
-          "${{ vars.UMBRACO_CLOUD_API_BASE_URL }}"
+      # Starts the deployment of the artifact on the target environment and waits for
+      # Umbraco Cloud to report it finished. The step fails if the deployment fails.
+      # The action wraps the Cloud CI/CD API calls, so this pipeline only passes
+      # parameters and is not affected by changes to how the API is called.
+      - name: Deploy artifact to Umbraco Cloud
+        uses: mikkelhm/umbraco-cloud-actions/deploy@v1
+        with:
+          project-id: ${{ secrets.projectId }}
+          api-key: ${{ secrets.umbracoCloudApiKey }}
+          artifact-id: ${{ inputs.artifactId }}
+          target-environment-alias: ${{ inputs.targetEnvironmentAlias }}
+          commit-message: "Run for ${{ github.run_number }}"
+          base-url: ${{ vars.UMBRACO_CLOUD_API_BASE_URL || 'https://api.cloud.umbraco.com' }}
