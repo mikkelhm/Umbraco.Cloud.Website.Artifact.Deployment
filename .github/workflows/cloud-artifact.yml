@@ -57,11 +57,16 @@ jobs:
           path: ${{ github.workspace }}/sources.zip
           retention-days: 1
 
-      # Upload your zipped artifact.
+      # Upload the zipped artifact with the v3 direct-to-storage flow: the script asks
+      # the Cloud API for a write-only blob SAS url, PUTs the zip straight to Azure Blob
+      # Storage (in blocks, with checksums) and then asks the API to verify and complete
+      # the artifact. The zip never travels through the API itself, so the 100 MB
+      # Cloudflare request limit that capped the old v2 upload does not apply; the
+      # ceiling is the 2 GiB the complete endpoint enforces.
       # Paths are relative because ${{ github.workspace }} expands to a Windows
       # path with backslashes, which bash interprets as escape sequences when
       # unquoted in the folded command.
-      - name: Post Zipped Artifact
+      - name: Upload Artifact to Cloud
         id: upload-artifact
         shell: bash
         run: |
