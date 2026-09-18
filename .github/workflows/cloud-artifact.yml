@@ -15,8 +15,40 @@ on:
 jobs:
   prepareDeployment:
     name: Prepare Artifact to cloud
-    # Windows runner to match the Windows App Service the artifact runs on.
-    runs-on: windows-latest
+    # ── Which runner? ───────────────────────────────────────────────────────────
+    #
+    # Umbraco Cloud runs your site on a Windows App Service, but the artifact does
+    # not have to be BUILT on Windows. The publish below is framework-dependent with
+    # no runtime identifier, so the output is the same IL and the same runtimes/*
+    # native assets whichever OS produces it, and the Web SDK generates web.config on
+    # any OS. This template has been verified end to end from ubuntu-latest.
+    #
+    # ubuntu-latest is the default because it is roughly twice as fast and billed at
+    # half the rate of windows-latest for this job.
+    #
+    # Switch to windows-latest if your build needs Windows. Typical reasons:
+    #
+    #   * A package or build step that only runs on Windows: an MSBuild task with a
+    #     Windows-only dependency, a .NET Framework project in the solution, a
+    #     COM-based tool, an installer that ships as .exe/.msi only.
+    #   * Front-end or asset tooling that is only set up for Windows, or npm packages
+    #     with Windows-only native binaries.
+    #   * Windows PowerShell 5.1 scripts (`powershell`, not `pwsh`) or .bat/.cmd files
+    #     in your build. pwsh runs on Linux; the other two do not.
+    #   * A build that publishes self-contained or with an explicit runtime identifier
+    #     (`-r win-x64`, `--self-contained`). Cross-publishing from Linux works for
+    #     most projects, but building on Windows removes the doubt.
+    #   * Anything you have only ever run on a developer's Windows machine and have
+    #     not verified on Linux. Linux file systems are case-sensitive, so a view or
+    #     file reference whose casing differs from the file on disk builds on Windows
+    #     and fails on Linux. Fix the casing rather than switching runners if you can,
+    #     since the App Service itself is case-insensitive and hides the mistake.
+    #
+    # Nothing else here changes: pwsh, dotnet and the upload action run the same on
+    # both. If you use Windows PowerShell 5.1 to zip, note that its Compress-Archive
+    # writes backslashes into entry names, which Zip Deploy unpacks incorrectly; use
+    # pwsh (PowerShell 7) as this file does.
+    runs-on: ubuntu-latest
     outputs:
       artifactId: ${{ steps.upload-artifact.outputs.artifact-id }}
     steps:
