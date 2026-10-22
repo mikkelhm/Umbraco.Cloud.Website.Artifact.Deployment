@@ -2,7 +2,7 @@
 # https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
 # Patch and minor updates are merged automatically by
-# .github/workflows/dependabot-auto-merge.yml. Major updates always wait for a
+# .github/workflows/pull-request.yml. Major updates always wait for a
 # human -- for Umbraco that means a CMS major, which needs the upgrade path
 # considered rather than merged.
 
